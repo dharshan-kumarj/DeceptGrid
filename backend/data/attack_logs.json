@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "time": "01:02",
+    "ip": "192.168.1.45",
+    "type": "FalseDataInjection",
+    "severity": "HIGH",
+    "target": "Honeypot_01",
+    "details": "Attempted to set Meter_01 to 999V"
+  }
+]
