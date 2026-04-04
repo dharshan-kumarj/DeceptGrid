@@ -133,21 +133,21 @@ class LSBSteganography:
 
             # Extract LSBs from all pixels
             pixels = list(image.getdata())
-            binary_message = ""
-
+            all_bits = []
             for pixel in pixels:
-                r, g, b = pixel
+                for channel_value in pixel:
+                    all_bits.append(str(channel_value & 1))
 
-                # Extract LSB from each channel
-                binary_message += str(r & 1)
-                binary_message += str(g & 1)
-                binary_message += str(b & 1)
-
-                # Check if we've found the delimiter
-                if binary_message.endswith(LSBSteganography.DELIMITER):
-                    # Remove delimiter and convert to text
-                    binary_message = binary_message[:-len(LSBSteganography.DELIMITER)]
-                    return LSBSteganography.binary_to_text(binary_message)
+            # Join all bits into one string for search
+            full_bit_str = "".join(all_bits)
+            
+            # Find the first occurrence of the delimiter
+            delim_index = full_bit_str.find(LSBSteganography.DELIMITER)
+            
+            if delim_index != -1:
+                # Extract message bits before the delimiter
+                message_bits = full_bit_str[:delim_index]
+                return LSBSteganography.binary_to_text(message_bits)
 
             # If we reach here, no delimiter was found
             return None

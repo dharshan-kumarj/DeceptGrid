@@ -4,7 +4,7 @@
  */
 
 // Base API URL - adjust for production vs development
-const API_BASE = 'http://localhost:8001';
+const API_BASE = 'http://localhost:8000';
 
 export const API = {
   // Steganography endpoints
