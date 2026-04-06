@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DeceptGrid — {% block title %}{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #050a0e; --bg2: #0a1420; --bg3: #0f1e2e;
+  --accent: #00ff9d; --accent2: #00c8ff; --accent3: #ff4d4d; --warn: #ffb800;
+  --text: #c8e6f0; --dim: #4a7a8a; --border: #1a3a4a;
+  --glow: 0 0 10px #00ff9d55; --glow2: 0 0 10px #00c8ff55; --glowR: 0 0 10px #ff4d4d55;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Share Tech Mono', monospace; overflow-x: hidden; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 24px; background: var(--bg2); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { font-family: 'Orbitron', sans-serif; font-size: 13px; color: var(--accent); letter-spacing: 3px; }
+.logo span { color: var(--accent3); }
+.status-row { display: flex; gap: 16px; font-size: 11px; }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; animation: blink 1.2s infinite; }
+.dot.g { background: var(--accent); box-shadow: var(--glow); }
+.dot.r { background: var(--accent3); box-shadow: var(--glowR); animation-delay:.3s; }
+.dot.y { background: var(--warn); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+/* ── BUTTONS ── */
+.btn {
+  font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 9px 18px;
+  border: 1px solid; cursor: pointer; letter-spacing: 2px; text-transform: uppercase;
+  transition: all .2s; background: transparent; text-decoration: none; display: inline-block;
+}
+.btn-c  { border-color: var(--accent2);  color: var(--accent2); }
+.btn-c:hover  { background: var(--accent2);  color: var(--bg); box-shadow: var(--glow2); }
+.btn-r  { border-color: var(--accent3);  color: var(--accent3); }
+.btn-r:hover  { background: var(--accent3);  color: var(--bg); box-shadow: var(--glowR); }
+.btn-g  { border-color: var(--accent);   color: var(--accent); }
+.btn-g:hover  { background: var(--accent);   color: var(--bg); box-shadow: var(--glow); }
+.btn-dim{ border-color: var(--dim);      color: var(--dim);     font-size: 11px; }
+.btn-dim:hover{ border-color: var(--text); color: var(--text); }
+
+/* ── PANEL ── */
+.panel { border: 1px solid var(--border); background: var(--bg2); margin-bottom: 16px; }
+.ph { padding: 9px 16px; border-bottom: 1px solid var(--border); font-size: 10px; color: var(--dim); letter-spacing: 2px; display: flex; justify-content: space-between; align-items: center; }
+.ph-t { color: var(--text); font-size: 11px; }
+.pb { padding: 16px; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); }
+::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+/* ── INPUT / SELECT ── */
+.field {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border);
+  color: var(--accent); font-family: 'Share Tech Mono', monospace; font-size: 12px;
+  padding: 9px 12px; outline: none; transition: border-color .2s;
+}
+.field:focus { border-color: var(--accent2); box-shadow: 0 0 6px #00c8ff22; }
+select.field { color: var(--text); }
+.field-lbl { font-size: 9px; color: var(--dim); letter-spacing: 2px; margin-bottom: 4px; display: block; }
+
+/* ── PAGE HEADER ── */
+.page-hdr { padding: 20px 24px 0; }
+.pg-title { font-family: 'Orbitron', sans-serif; font-size: 15px; letter-spacing: 3px; margin-bottom: 3px; }
+.pg-sub { font-size: 10px; color: var(--dim); letter-spacing: 2px; margin-bottom: 16px; }
+
+/* ── MAIN ── */
+.main { padding: 0 24px 30px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media(max-width:768px){ .grid2{grid-template-columns:1fr;} }
+
+/* ── BADGE ── */
+.badge { font-size: 9px; padding: 2px 8px; border-radius: 1px; letter-spacing: 1px; }
+.badge-open     { background:#00ff9d22; color:var(--accent);  border:1px solid #00ff9d44; }
+.badge-filtered { background:#ffb80022; color:var(--warn);    border:1px solid #ffb80044; }
+.badge-closed   { background:#ff4d4d22; color:var(--accent3); border:1px solid #ff4d4d44; }
+.badge-honey    { background:#ff4d4d22; color:var(--accent3); border:1px solid #ff4d4d44; font-size:8px; margin-left:5px; }
+
+/* ── LOG BOX ── */
+.logbox { background: var(--bg3); padding: 10px; font-size: 10px; line-height: 2; overflow-y: auto; }
+.lok  { color: var(--accent); }
+.lw   { color: var(--warn); }
+.lerr { color: var(--accent3); }
+.ldim { color: var(--dim); }
+
+/* ── PROGRESS BAR ── */
+.pbar-wrap { height: 3px; background: var(--border); overflow: hidden; margin-bottom: 16px; }
+.pbar-fill  { height: 100%; width: 0; transition: width .1s linear; background: linear-gradient(90deg, var(--accent2), var(--accent)); }
+
+{% block extra_style %}{% endblock %}
+</style>
+</head>
+<body>
+{% if request.path != '/' %}
+<div class="topbar">
+  <div class="logo">DECEPTGRID <span>// {% block module %}{% endblock %}</span></div>
+  <div class="status-row">
+    {% block status_items %}{% endblock %}
+  </div>
+</div>
+{% endif %}
+
+{% block body %}{% endblock %}
+
+<script>
+// Shared helper
+function ts() { return new Date().toLocaleTimeString(); }
+function appendLog(el, html) { el.innerHTML += html; el.scrollTop = el.scrollHeight; }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

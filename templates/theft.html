@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Data Theft{% endblock %}
+{% block module %}EXFILTRATION{% endblock %}
+
+{% block status_items %}
+  <span><span class="dot g"></span>SESSION: admin@192.168.10.14</span>
+  <span><span class="dot g"></span>TUNNEL: AES-256</span>
+{% endblock %}
+
+{% block extra_style %}
+.ft-dir  { color:var(--accent2); font-size:11px; line-height:2.4; }
+.ft-file { color:var(--text); font-size:11px; line-height:2.4; cursor:pointer; display:block; padding-left:20px; transition:color .15s; }
+.ft-file:hover { color:var(--accent); }
+.ft-file.sel   { color:var(--accent); }
+
+.q-item { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); font-size:10px; }
+.q-item:last-child { border-bottom:none; }
+.q-done    { color:var(--accent); }
+.q-pending { color:var(--warn); animation:blink 1s infinite; }
+.q-empty   { text-align:center; padding:50px 0; font-size:10px; letter-spacing:2px; color:var(--border); }
+
+.tb-wrap { margin:12px 0; }
+.tb-top  { display:flex; justify-content:space-between; font-size:10px; color:var(--dim); margin-bottom:5px; }
+.tb-track{ height:4px; background:var(--border); overflow:hidden; border-radius:2px; }
+.tb-fill { height:100%; width:0; background:linear-gradient(90deg,var(--accent3),var(--warn)); transition:width .2s; }
+
+.preview-box { background:var(--bg3); border:1px solid var(--border); padding:14px; font-size:10px; line-height:1.9; color:var(--dim); min-height:90px; white-space:pre-wrap; word-break:break-all; }
+
+.success-overlay {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.87); z-index:9998;
+  align-items:center; justify-content:center; flex-direction:column; text-align:center;
+}
+.success-overlay.show { display:flex; animation:fadeIn .5s; }
+.so-title { font-family:'Orbitron',sans-serif; font-size:34px; color:var(--accent3); text-shadow:var(--glowR); margin-bottom:14px; }
+.so-box { background:var(--bg2); border:1px solid #ff4d4d33; padding:18px 28px; min-width:300px; text-align:left; font-size:11px; margin:16px 0 24px; }
+.so-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border); }
+.so-row:last-child { border-bottom:none; }
+.so-k { color:var(--dim); }
+.so-v { color:var(--accent3); }
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+{% endblock %}
+
+{% block body %}
+<div class="page-hdr">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div class="pg-title" style="color:var(--accent3)">▸ FAKE DATA THEFT</div>
+      <div class="pg-sub">SSH SESSION: admin@192.168.10.14 — RTU-SUBSTATION-04</div>
+    </div>
+    <a href="/brute" class="btn btn-dim">← BRUTE FORCE</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="grid2">
+    <!-- LEFT: File Browser + Preview -->
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="ph-t">REMOTE FILE SYSTEM</span><span>/var/scada/</span></div>
+        <div class="pb" id="fileTree">
+          <!-- rendered by JS -->
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="ph-t">FILE PREVIEW</span><span id="previewName" style="color:var(--dim)">—</span></div>
+        <div class="pb" style="padding:10px;">
+          <div class="preview-box" id="previewBox">← Select a file to preview contents</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Exfil Queue + Log -->
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="ph-t">EXFIL QUEUE</span><span id="qCount" style="color:var(--dim)">0 files</span></div>
+        <div class="pb" style="padding:10px;">
+          <div id="exfilQueue"><div class="q-empty">NO FILES QUEUED</div></div>
+          <div class="tb-wrap" id="tbWrap" style="display:none;">
+            <div class="tb-top"><span>TRANSFERRING</span><span id="tbPct">0%</span></div>
+            <div class="tb-track"><div class="tb-fill" id="tbFill"></div></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn btn-r" onclick="startExfil()">⬇ EXFILTRATE ALL</button>
+            <button class="btn btn-dim" onclick="clearQueue()">✕ CLEAR</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="ph-t">TRANSFER LOG</span><span id="xStatus" style="color:var(--dim)">IDLE</span></div>
+        <div class="logbox" id="xLog" style="height:160px;">
+          <span class="ldim">// Add files to queue and begin exfiltration...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SUCCESS OVERLAY -->
+<div class="success-overlay" id="successOverlay">
+  <div class="so-title">⚡ DATA EXTRACTED</div>
+  <p style="color:var(--dim);font-size:12px;max-width:380px;line-height:1.8;margin-bottom:6px;">
+    Exfiltration complete. All files transferred to remote C2 server via encrypted tunnel.
+    Honeypot logs captured this operation.
+  </p>
+  <div class="so-box" id="soTable"></div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+    <button class="btn btn-dim" onclick="document.getElementById('successOverlay').classList.remove('show')">CLOSE</button>
+    <a href="/" class="btn btn-g">⟫ BACK TO HOME</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let files = [], queue = [], exfilRunning = false;
+
+async function loadFiles() {
+  const res = await fetch('/api/files');
+  const data = await res.json();
+  files = data.files;
+  renderTree();
+}
+
+function renderTree() {
+  const grouped = {};
+  files.forEach(f => {
+    if (!grouped[f.path]) grouped[f.path] = [];
+    grouped[f.path].push(f);
+  });
+  let html = '';
+  for (const [path, fs] of Object.entries(grouped)) {
+    const icon = path.includes('config') ? '⚙️' : path.includes('logs') ? '📋' : '🗃️';
+    html += `<div class="ft-dir">${icon} ${path}</div><div style="padding-left:16px;">`;
+    fs.forEach(f => {
+      const icon2 = f.type==='LOG'?'📋':f.type==='DB'?'🗃️':f.type==='PDF'?'📑':f.type==='TXT'?'🔑':'📄';
+      html += `<span class="ft-file" data-name="${f.name}" onclick="selectFile('${f.name}')">${icon2} ${f.name} <span style="color:var(--dim);font-size:9px;margin-left:6px;">${f.size}</span></span>`;
+    });
+    html += '</div>';
+  }
+  document.getElementById('fileTree').innerHTML = html;
+}
+
+async function selectFile(name) {
+  document.querySelectorAll('.ft-file').forEach(f=>f.classList.remove('sel'));
+  document.querySelector(`[data-name="${name}"]`)?.classList.add('sel');
+  document.getElementById('previewName').textContent = name;
+
+  const res = await fetch(`/api/preview/${name}`);
+  const data = await res.json();
+  document.getElementById('previewBox').textContent = data.content;
+
+  // Add to queue if not already there
+  const f = files.find(x=>x.name===name);
+  if (f && !queue.find(q=>q.name===name)) {
+    queue.push({...f, status:'pending'});
+    renderQueue();
+  }
+}
+
+function renderQueue() {
+  document.getElementById('qCount').textContent = queue.length + ' file' + (queue.length!==1?'s':'');
+  if (!queue.length) {
+    document.getElementById('exfilQueue').innerHTML = '<div class="q-empty">NO FILES QUEUED</div>';
+    return;
+  }
+  document.getElementById('exfilQueue').innerHTML = queue.map(f=>`
+    <div class="q-item">
+      <span>${f.name}</span>
+      <span style="color:var(--dim)">${f.size}</span>
+      <span class="${f.status==='done'?'q-done':'q-pending'}">${f.status==='done'?'✓ DONE':'⏳ QUEUED'}</span>
+    </div>
+  `).join('');
+}
+
+function clearQueue() { queue=[]; renderQueue(); document.getElementById('tbWrap').style.display='none'; }
+
+async function startExfil() {
+  if (exfilRunning || !queue.length) return;
+  exfilRunning = true;
+  document.getElementById('xStatus').textContent='ACTIVE';
+  document.getElementById('xStatus').style.color='var(--accent3)';
+  document.getElementById('tbWrap').style.display='block';
+  const log = document.getElementById('xLog');
+  log.innerHTML='';
+  appendLog(log, `<div class="lok">[+] Session: admin@192.168.10.14 — AUTHENTICATED</div>`);
+  appendLog(log, `<div class="lw">[!] Establishing encrypted tunnel to C2: 185.220.101.x</div>`);
+
+  for (let i=0; i<queue.length; i++) {
+    const f = queue[i];
+    const pct = Math.round(((i+1)/queue.length)*100);
+    document.getElementById('tbFill').style.width = pct+'%';
+    document.getElementById('tbPct').textContent = pct+'%';
+    appendLog(log, `<div class="lw">[~] Copying ${f.name} (${f.size})...</div>`);
+    await sleep(900);
+    queue[i].status = 'done';
+    renderQueue();
+    appendLog(log, `<div class="lok">[✓] ${f.name} — transferred.</div>`);
+    await sleep(300);
+  }
+
+  // Post to backend
+  await fetch('/api/exfil', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({files:queue})});
+
+  appendLog(log, `<div class="lok">[✓] All files exfiltrated successfully.</div>`);
+  document.getElementById('xStatus').textContent='COMPLETE';
+  document.getElementById('xStatus').style.color='var(--accent)';
+  exfilRunning = false;
+  showSuccess();
+}
+
+function showSuccess() {
+  const total = queue.reduce((s,f)=>s+parseFloat(f.size),0);
+  document.getElementById('soTable').innerHTML = `
+    <div class="so-row"><span class="so-k">TARGET</span><span class="so-v">RTU-SUBSTATION-04</span></div>
+    <div class="so-row"><span class="so-k">IP</span><span class="so-v">192.168.10.14</span></div>
+    <div class="so-row"><span class="so-k">FILES</span><span class="so-v">${queue.length}</span></div>
+    <div class="so-row"><span class="so-k">VOLUME</span><span class="so-v">~${total.toFixed(1)} units</span></div>
+    <div class="so-row"><span class="so-k">TUNNEL</span><span class="so-v">AES-256 / Tor</span></div>
+    <div class="so-row"><span class="so-k">STATUS</span><span class="so-v" style="color:var(--accent)">SUCCESS</span></div>
+  `;
+  document.getElementById('successOverlay').classList.add('show');
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+loadFiles();
+</script>
+{% endblock %}

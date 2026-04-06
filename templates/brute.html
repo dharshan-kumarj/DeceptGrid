@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Brute Force{% endblock %}
+{% block module %}BRUTE FORCE{% endblock %}
+
+{% block status_items %}
+  <span><span class="dot g"></span>TARGET LOCKED</span>
+  <span><span class="dot r"></span>HONEYPOT: LOGGING</span>
+{% endblock %}
+
+{% block extra_style %}
+.ti-row { display:flex; justify-content:space-between; font-size:11px; padding:3px 0; border-bottom:1px solid var(--border); }
+.ti-row:last-child { border-bottom:none; }
+.ti-k { color:var(--dim); }
+.ti-v { color:var(--accent2); }
+
+.stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border); }
+.sg-cell { background:var(--bg3); padding:10px; text-align:center; }
+.sg-v { font-size:22px; color:var(--accent2); font-family:'Orbitron',sans-serif; }
+.sg-l { font-size:9px; color:var(--dim); letter-spacing:1px; margin-top:2px; }
+
+.ring-wrap { position:relative; width:84px; height:84px; margin:8px auto; }
+.ring-wrap svg { transform:rotate(-90deg); }
+.ring-bg   { fill:none; stroke:var(--border); stroke-width:5; }
+.ring-fill { fill:none; stroke:var(--accent); stroke-width:5; stroke-dasharray:227; stroke-dashoffset:227; transition:stroke-dashoffset .3s; }
+.ring-txt  { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Orbitron',sans-serif; font-size:13px; color:var(--accent); }
+
+.honey-alert {
+  display:none; padding:12px 14px; border:1px solid #00ff9d44; background:#00ff9d07;
+  animation:fadeIn .4s;
+}
+.honey-alert.show { display:block; }
+.ha-t { color:var(--accent); font-size:13px; margin-bottom:5px; }
+.ha-d { font-size:10px; color:var(--dim); line-height:1.9; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+{% endblock %}
+
+{% block body %}
+<div class="page-hdr">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div class="pg-title" style="color:var(--accent3)">▸ BRUTE FORCE LOGIN</div>
+      <div class="pg-sub">CREDENTIAL DICTIONARY ATTACK — HONEYPOT LOGGER ACTIVE</div>
+    </div>
+    <a href="/scanner" class="btn btn-dim">← SCANNER</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="grid2">
+    <!-- LEFT -->
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="ph-t">TARGET CONFIGURATION</span><span>SSH / Port 22</span></div>
+        <div class="pb">
+          <div style="padding:10px;background:var(--bg3);border-left:3px solid var(--accent2);margin-bottom:14px;">
+            <div class="ti-row"><span class="ti-k">IP ADDRESS</span><span class="ti-v">192.168.10.14</span></div>
+            <div class="ti-row"><span class="ti-k">HOSTNAME</span><span class="ti-v">RTU-SUBSTATION-04</span></div>
+            <div class="ti-row"><span class="ti-k">PORT</span><span class="ti-v">22 (SSH)</span></div>
+            <div class="ti-row"><span class="ti-k">BANNER</span><span class="ti-v" style="font-size:10px">OpenSSH 7.4p1</span></div>
+          </div>
+          <label class="field-lbl">USERNAME</label>
+          <input class="field" id="bruteUser" value="admin" style="margin-bottom:10px;"/>
+          <label class="field-lbl">WORDLIST</label>
+          <select class="field" id="wlSelect" style="margin-bottom:14px;">
+            <option>rockyou-top500.txt</option>
+            <option>scada-default-creds.txt</option>
+            <option>ics-passwords.txt</option>
+            <option>common-grid-auth.txt</option>
+          </select>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-r" id="btnStart" onclick="startBrute()">▶ START ATTACK</button>
+            <button class="btn btn-dim" id="btnStop" style="display:none" onclick="stopBrute()">■ STOP</button>
+          </div>
+          <div class="stat-grid" style="margin-top:14px;">
+            <div class="sg-cell"><div class="sg-v" id="bAttempts">0</div><div class="sg-l">ATTEMPTS</div></div>
+            <div class="sg-cell"><div class="sg-v" id="bRate">0</div><div class="sg-l">REQ/SEC</div></div>
+            <div class="sg-cell"><div class="sg-v" id="bFound">0</div><div class="sg-l">FOUND</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><span class="ph-t">HONEYPOT ALERT</span><span style="color:var(--accent3)">⬤ LIVE</span></div>
+        <div class="pb">
+          <div class="honey-alert" id="honeyAlert">
+            <div class="ha-t">🍯 HONEYPOT TRIGGERED</div>
+            <div class="ha-d" id="honeyDetail"></div>
+          </div>
+          <div id="honeyIdle" style="font-size:10px;color:var(--dim);">
+            No honeypot interactions detected. Begin credential attack to generate events.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="ph-t">ATTACK LOG</span><span id="bruteStatus" style="color:var(--warn)">IDLE</span></div>
+        <div class="logbox" id="attackLog" style="height:220px;">
+          <span class="ldim">// Waiting for attack to begin...</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><span class="ph-t">PROGRESS</span></div>
+        <div class="pb" style="text-align:center;">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 84 84" width="84" height="84">
+              <circle class="ring-bg"   cx="42" cy="42" r="36"/>
+              <circle class="ring-fill" id="ringFill" cx="42" cy="42" r="36"/>
+            </svg>
+            <div class="ring-txt" id="ringPct">0%</div>
+          </div>
+          <div style="font-size:10px;color:var(--dim);margin-top:6px;">
+            WORDLIST: <span id="wlProgress" style="color:var(--text)">0 / 0</span>
+          </div>
+          <div id="successBox" style="display:none;margin-top:14px;border:1px solid #00ff9d44;background:#00ff9d08;padding:12px;">
+            <div style="color:var(--accent);font-size:13px;margin-bottom:6px;">✓ CREDENTIALS FOUND</div>
+            <div style="font-size:10px;color:var(--dim);" id="successCreds"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let wordlist = [], timer = null, idx = 0, rateCount = 0, rateTimer = null;
+
+async function loadWordlist() {
+  const res = await fetch('/api/wordlist');
+  const data = await res.json();
+  wordlist = data.wordlist;
+  document.getElementById('wlProgress').textContent = `0 / ${wordlist.length}`;
+}
+loadWordlist();
+
+async function startBrute() {
+  if (timer) return;
+  document.getElementById('btnStart').style.display='none';
+  document.getElementById('btnStop').style.display='inline-block';
+  document.getElementById('bruteStatus').textContent='RUNNING';
+  document.getElementById('bruteStatus').style.color='var(--accent3)';
+  const log = document.getElementById('attackLog');
+  log.innerHTML=''; idx=0; rateCount=0;
+  document.getElementById('bAttempts').textContent='0';
+  document.getElementById('bFound').textContent='0';
+
+  rateTimer = setInterval(()=>{
+    document.getElementById('bRate').textContent = rateCount;
+    rateCount=0;
+  }, 1000);
+
+  timer = setInterval(async () => {
+    if (idx >= wordlist.length) { stopBrute(true); return; }
+    const pwd = wordlist[idx];
+    const user = document.getElementById('bruteUser').value || 'admin';
+    idx++; rateCount++;
+    document.getElementById('bAttempts').textContent = idx;
+    const pct = Math.round((idx/wordlist.length)*100);
+    document.getElementById('ringFill').style.strokeDashoffset = 227-(227*pct/100);
+    document.getElementById('ringPct').textContent = pct+'%';
+    document.getElementById('wlProgress').textContent = `${idx} / ${wordlist.length}`;
+
+    const res = await fetch('/api/brute', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username:user, password:pwd, attempt_num:idx, target_ip:'192.168.10.14'})
+    });
+    const data = await res.json();
+
+    if (data.honeypot_triggered) {
+      document.getElementById('honeyAlert').classList.add('show');
+      document.getElementById('honeyIdle').style.display='none';
+      document.getElementById('honeyDetail').innerHTML =
+        `IP 192.168.10.22 logged attempt at ${ts()}<br/>
+         User: <span style="color:var(--accent)">${user}</span> &nbsp;
+         Pass: <span style="color:var(--accent)">${pwd}</span><br/>
+         This is a honeypot — all credentials forwarded to SOC.`;
+    }
+
+    if (data.success) {
+      appendLog(log, `<div class="lok">✓ [${idx}] ${user}:${pwd} → ACCESS GRANTED ✓</div>`);
+      document.getElementById('bFound').textContent='1';
+      clearInterval(timer); timer=null; clearInterval(rateTimer);
+      stopBrute(false);
+      document.getElementById('successBox').style.display='block';
+      document.getElementById('successCreds').innerHTML=`User: <span style="color:var(--accent)">${user}</span><br/>Pass: <span style="color:var(--accent)">${pwd}</span>`;
+      document.getElementById('bruteStatus').textContent='SUCCESS';
+      document.getElementById('bruteStatus').style.color='var(--accent)';
+      setTimeout(()=>location.href='/theft', 2000);
+      return;
+    }
+    appendLog(log, `<div class="lerr">✗ [${idx}] ${user}:${pwd} → FAILED</div>`);
+  }, 100);
+}
+
+function stopBrute(exhausted) {
+  if (timer) { clearInterval(timer); timer=null; }
+  if (rateTimer) { clearInterval(rateTimer); rateTimer=null; }
+  document.getElementById('btnStart').style.display='inline-block';
+  document.getElementById('btnStop').style.display='none';
+  if (exhausted) {
+    document.getElementById('bruteStatus').textContent='EXHAUSTED';
+    document.getElementById('bruteStatus').style.color='var(--dim)';
+  }
+}
+</script>
+{% endblock %}

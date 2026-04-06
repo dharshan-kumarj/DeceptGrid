@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Network Scanner{% endblock %}
+{% block module %}RECON{% endblock %}
+
+{% block status_items %}
+  <span><span class="dot g"></span>VPN TUNNEL ACTIVE</span>
+  <span><span class="dot r"></span>IDS BYPASSED</span>
+  <span><span class="dot y"></span>PROXY: 12 HOPS</span>
+{% endblock %}
+
+{% block extra_style %}
+.tbl-hdr {
+  display: grid; grid-template-columns: 36px 140px 1fr 160px 100px 70px;
+  padding: 8px 14px; background: var(--bg3); border: 1px solid var(--border);
+  border-bottom: none; font-size: 10px; color: var(--dim); letter-spacing: 2px;
+}
+.dev-row {
+  display: grid; grid-template-columns: 36px 140px 1fr 160px 100px 70px;
+  padding: 10px 14px; font-size: 12px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .15s; align-items: center;
+}
+.dev-row:last-child { border-bottom: none; }
+.dev-row:hover { background: var(--bg3); }
+.dev-row.sel    { background: #00c8ff0a; border-left: 3px solid var(--accent2); }
+.dev-row.honey  { border-left: 3px solid var(--accent3) !important; }
+.scan-footer { display:flex; justify-content:space-between; align-items:center; margin-top:14px; flex-wrap:wrap; gap:10px; }
+.stat-txt { font-size:10px; color:var(--dim); }
+.stat-txt b { color:var(--text); }
+.ping-ok   { color:var(--accent); }
+.ping-slow { color:var(--warn); }
+{% endblock %}
+
+{% block body %}
+<div class="page-hdr">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div class="pg-title" style="color:var(--accent2)">▸ NETWORK SCANNER</div>
+      <div class="pg-sub">TARGET RANGE: 192.168.10.0/24 — SCADA SUBNET</div>
+    </div>
+    <a href="/" class="btn btn-dim">← HOME</a>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Controls -->
+  <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+    <input class="field" id="scanTarget" value="192.168.10.0/24" style="flex:1;min-width:200px;"/>
+    <button class="btn btn-c" onclick="startScan()">⟫ SCAN NETWORK</button>
+  </div>
+  <div class="pbar-wrap"><div class="pbar-fill" id="scanBar"></div></div>
+  <div class="logbox" id="scanLog" style="height:90px;margin-bottom:16px;">
+    <span class="ldim">// Awaiting scan initiation...</span>
+  </div>
+
+  <!-- Device Table -->
+  <div class="tbl-hdr">
+    <span>#</span><span>IP ADDRESS</span><span>HOSTNAME</span><span>TYPE</span><span>STATUS</span><span>PING</span>
+  </div>
+  <div class="panel" style="margin:0;border-radius:0;">
+    <div id="devList" style="min-height:60px;"></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="scan-footer">
+    <div class="stat-txt" id="scanStats">
+      Hosts: <b id="sHosts">—</b> &nbsp;|&nbsp; Open Ports: <b id="sPorts">—</b> &nbsp;|&nbsp; Honeypots: <b id="sHoney">—</b> &nbsp;|&nbsp; Time: <b id="sTime">—</b>
+    </div>
+    <button class="btn btn-r" id="btnLaunch" style="display:none" onclick="location.href='/brute'">⚡ LAUNCH BRUTE FORCE →</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let scanning = false;
+async function startScan() {
+  if (scanning) return;
+  scanning = true;
+  const target = document.getElementById('scanTarget').value;
+  const log = document.getElementById('scanLog');
+  const bar = document.getElementById('scanBar');
+  const list = document.getElementById('devList');
+  log.innerHTML = ''; list.innerHTML = '';
+  document.getElementById('btnLaunch').style.display = 'none';
+  bar.style.width = '0%';
+  bar.style.background = 'linear-gradient(90deg,var(--accent2),var(--accent))';
+  const t0 = Date.now();
+
+  const res = await fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({target})});
+  const data = await res.json();
+
+  // Animate logs
+  for (let i = 0; i < data.logs.length; i++) {
+    await sleep(160);
+    const l = data.logs[i];
+    const cls = l.startsWith('[+]') ? 'lok' : l.startsWith('[WARN]') ? 'lw' : 'ldim';
+    appendLog(log, `<div class="${cls}">${l}</div>`);
+    bar.style.width = Math.round(((i+1)/data.logs.length)*100) + '%';
+  }
+
+  // Render devices
+  data.devices.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'dev-row' + (d.honeypot ? ' honey' : '');
+    const bc = d.status==='open' ? 'badge-open' : d.status==='filtered' ? 'badge-filtered' : 'badge-closed';
+    const ping = d.ping ? `<span class="${d.ping<5?'ping-ok':'ping-slow'}">${d.ping}ms</span>` : '<span class="ldim">—</span>';
+    const hp = d.honeypot ? '<span class="badge-honey badge">HONEY</span>' : '';
+    row.innerHTML = `
+      <span class="ldim">${String(i+1).padStart(2,'0')}</span>
+      <span style="color:var(--accent2)">${d.ip}</span>
+      <span>${d.host}${hp}</span>
+      <span style="font-size:10px;color:var(--dim)">${d.type}</span>
+      <span><span class="badge ${bc}">${d.status.toUpperCase()}</span></span>
+      <span>${ping}</span>
+    `;
+    row.onclick = () => { document.querySelectorAll('.dev-row').forEach(r=>r.classList.remove('sel')); row.classList.add('sel'); };
+    list.appendChild(row);
+  });
+
+  document.getElementById('sHosts').textContent = data.stats.hosts;
+  document.getElementById('sPorts').textContent = data.stats.open_ports;
+  document.getElementById('sHoney').textContent = data.stats.honeypots;
+  document.getElementById('sTime').textContent = ((Date.now()-t0)/1000).toFixed(1)+'s';
+  document.getElementById('btnLaunch').style.display = 'inline-block';
+  bar.style.background = 'var(--accent)';
+  scanning = false;
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+</script>
+{% endblock %}
