@@ -258,3 +258,5 @@ tmp/
 temp/
 .tmp/
 .temp/
+
+certs/
