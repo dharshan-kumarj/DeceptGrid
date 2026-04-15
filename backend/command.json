@@ -1,0 +1,8 @@
+{
+  "action": "set_config",
+  "target_meter": "SM-REAL-051",
+  "value": {
+    "sampling_rate": 1000,
+    "transmission_interval": 300
+  }
+}

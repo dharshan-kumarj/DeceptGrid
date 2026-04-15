@@ -486,9 +486,8 @@ curl -s http://localhost:8000/api/meter/security/events | python3 -m json.tool
 
 ### Test 4: Generate GPG Key and Sign Command
 
-#### Step 1: Generate GPG Key
+#### Step 1: Generate GPG Key (Run this ONCE)
 ```bash
-# Generate keypair
 gpg --batch --generate-key <<EOF
 %no-protection
 Key-Type: RSA
@@ -496,12 +495,38 @@ Key-Length: 2048
 Name-Email: engineer@deceptgrid.local
 Expire-Date: 2030-12-31
 EOF
+```
 
-# List keys to get fingerprint
+**Expected Output:**
+```
+gpg: key D793720C0D49ADD7 marked as ultimately trusted
+gpg: revocation certificate stored as '/home/dharshan/.gnupg/openpgp-revocs.d/...'
+```
+
+#### Step 2: Get Your Fingerprint
+```bash
 gpg --list-keys --keyid-format=long engineer@deceptgrid.local
 ```
 
-#### Step 2: Create Command
+**Expected Output:**
+```
+pub   rsa2048/D793720C0D49ADD7 2026-04-15 [SCEA] [expires: 2030-12-31]
+      ABFBF4B4B75B94D01E1756C6D793720C0D49ADD7
+uid                 [ultimate] engineer@deceptgrid.local
+```
+
+**Copy the full fingerprint:** `ABFBF4B4B75B94D01E1756C6D793720C0D49ADD7`
+
+#### Step 3: Register Your Key (Backend Admin)
+```bash
+# The fingerprint is already registered in authorized_signers.json
+# If using a different key, add it to:
+# /home/dharshan/projects/DeceptGrid/keys/authorized_signers.json
+
+cat /home/dharshan/projects/DeceptGrid/keys/authorized_signers.json
+```
+
+#### Step 4: Create Command
 ```bash
 cat > command.json <<'EOF'
 {
@@ -515,25 +540,18 @@ cat > command.json <<'EOF'
 EOF
 ```
 
-#### Step 3: Sign Command
+#### Step 5: Sign Command
 ```bash
 gpg --sign --armor --output command.json.asc command.json
 ```
 
-#### Step 4: Read Signed Payload
+#### Step 6: Send Signed Command (FULLY WORKING)
 ```bash
-cat command.json.asc
-```
-
-#### Step 5: Send Signed Command
-```bash
-# Extract the signed payload (everything between BEGIN/END)
 SIGNED_PAYLOAD=$(cat command.json.asc)
 
-# Send to API
 curl -X POST http://localhost:8000/api/meter/config \
   -H "Content-Type: application/json" \
-  -d "{\"signed_payload\": $(echo "$SIGNED_PAYLOAD" | python3 -c 'import sys, json; print(json.dumps(sys.stdin.read()))')}" | python3 -m json.tool
+  -d "{\"signed_payload\": $(echo "$SIGNED_PAYLOAD" | python3 -c 'import sys, json; print(json.dumps(sys.stdin.read()))')}"
 ```
 
 **Expected Output:**
@@ -545,6 +563,28 @@ curl -X POST http://localhost:8000/api/meter/config \
   "command_action": "set_config"
 }
 ```
+
+#### ✅ Layer 5 Now Fully Operational!
+
+Quick test (copy-paste ready):
+```bash
+# Navigate to backend directory
+cd /home/dharshan/projects/DeceptGrid/backend
+
+# Create command
+cat > cmd.json <<'EOF'
+{"action":"reset","target_meter":"SM-REAL-052","value":{"reboot":true}}
+EOF
+
+# Sign it
+gpg --sign --armor --output cmd.json.asc cmd.json
+
+# Send it
+curl -X POST http://localhost:8000/api/meter/config \
+  -H "Content-Type: application/json" \
+  -d "{\"signed_payload\": $(cat cmd.json.asc | python3 -c 'import sys, json; print(json.dumps(sys.stdin.read()))')}" | python3 -m json.tool
+```
+
 
 ---
 

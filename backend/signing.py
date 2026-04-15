@@ -3,12 +3,13 @@ Layer 5: Cryptographic Code Signing for Meter Commands
 Uses GPG (GNU Privacy Guard) with RSA 4096-bit keys
 """
 
-import gnupg
+import subprocess
 import os
 import logging
 from typing import Tuple, Optional, Dict
 from pathlib import Path
 import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,6 @@ class CodeSigner:
         """
         self.keys_dir = Path(keys_dir)
         self.authorized_keys_dir = self.keys_dir / "authorized_keys"
-        self.gpg = gnupg.GPG()
 
         # Create directories if they don't exist
         self.keys_dir.mkdir(parents=True, exist_ok=True)
@@ -55,51 +55,15 @@ class CodeSigner:
 
         # Default authorized signers for testing
         return {
-            "engineer_1": "DE4A19D0F73B66A3",  # Example fingerprint
+            "engineer": "ABFBF4B4B75B94D01E1756C6D793720C0D49ADD7",
+            "engineer_1": "DE4A19D0F73B66A3",
             "admin": "D2A1E3F4B5C6D7E8",
             "ops_team": "A1B2C3D4E5F6G7H8"
         }
 
-    def import_public_key(self, key_path: str, signer_name: str) -> bool:
-        """
-        Import a public key and register the signer.
-
-        Args:
-            key_path: Path to ASCII-armored public key file
-            signer_name: Name/identifier for this signer
-
-        Returns:
-            True if successful
-        """
-        try:
-            with open(key_path) as f:
-                key_data = f.read()
-
-            import_result = self.gpg.import_keys(key_data)
-
-            if import_result.count > 0:
-                # Get fingerprint from imported key
-                fingerprint = import_result.fingerprints[0]
-                self.authorized_signers[signer_name] = fingerprint
-
-                # Save updated mapping
-                config_file = self.keys_dir / "authorized_signers.json"
-                with open(config_file, 'w') as f:
-                    json.dump(self.authorized_signers, f, indent=2)
-
-                logger.info(f"✓ Imported public key for {signer_name}: {fingerprint}")
-                return True
-            else:
-                logger.error(f"✗ Failed to import key from {key_path}")
-                return False
-
-        except Exception as e:
-            logger.error(f"✗ Error importing key: {e}")
-            return False
-
     def verify_signature(self, signed_payload: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """
-        Verify a GPG-signed payload.
+        Verify a GPG-signed payload using system GPG.
 
         Args:
             signed_payload: ASCII-armored GPG message
@@ -108,28 +72,79 @@ class CodeSigner:
             (is_valid, signer_identity, command_json)
         """
         try:
-            # Verify signature
-            verified = self.gpg.verify(signed_payload)
+            # Write signed payload to temp file
+            temp_file = "/tmp/signed_payload.asc"
+            with open(temp_file, 'w') as f:
+                f.write(signed_payload)
 
-            if not verified.valid:
-                logger.warning("INVALID_SIGNATURE: GPG signature verification failed")
+            # Verify signature using system gpg
+            result = subprocess.run(
+                ["gpg", "--verify", temp_file],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode != 0:
+                logger.warning(f"INVALID_SIGNATURE: {result.stderr}")
                 return False, None, None
 
-            # Extract signer info
-            signer_fingerprint = verified.fingerprint
-            signer_name = verified.username
+            # Extract signature details from stderr output
+            # Example: gpg: using RSA key ABFBF4B4B75B94D01E1756C6D793720C0D49ADD7
+            #          gpg: Good signature from "engineer@deceptgrid.local" [ultimate]
+
+            fingerprint = None
+            signer_name = None
+
+            for line in result.stderr.split('\n'):
+                if 'using RSA key' in line:
+                    fingerprint = line.split()[-1].strip()
+                if 'Good signature from' in line:
+                    match = re.search(r'"([^"]+)"', line)
+                    if match:
+                        signer_name = match.group(1)
+
+            if not fingerprint or not signer_name:
+                logger.warning("INVALID_SIGNATURE: Could not extract signer info")
+                return False, None, None
 
             # Check if signer is authorized
-            is_authorized = signer_fingerprint in self.authorized_signers.values()
+            is_authorized = fingerprint in self.authorized_signers.values()
 
             if not is_authorized:
                 logger.warning(
-                    f"UNAUTHORIZED_SIGNER: {signer_name} (fingerprint: {signer_fingerprint})"
+                    f"UNAUTHORIZED_SIGNER: {signer_name} (fingerprint: {fingerprint})"
                 )
                 return False, None, None
 
-            # Extract the signed data
-            command_json = verified.data.decode('utf-8')
+            # Extract signed data (everything before BEGIN PGP MESSAGE)
+            lines = signed_payload.split('\n')
+
+            # Find the start of the PGP message
+            start_idx = None
+            for i, line in enumerate(lines):
+                if 'BEGIN PGP MESSAGE' in line:
+                    start_idx = i
+                    break
+
+            if start_idx is None:
+                logger.error("INVALID_COMMAND: No PGP message found")
+                return False, None, None
+
+            # The actual payload is encoded in the base64 section
+            # For now, we'll extract it using gpg decryption
+            decrypt_result = subprocess.run(
+                ["gpg", "--decrypt", "--quiet", temp_file],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if decrypt_result.returncode != 0:
+                logger.error(f"Failed to decrypt signed message: {decrypt_result.stderr}")
+                return False, None, None
+
+            command_json = decrypt_result.stdout.strip()
 
             logger.info(f"SIGNED_COMMAND_ACCEPTED: {signer_name}")
             return True, signer_name, command_json
