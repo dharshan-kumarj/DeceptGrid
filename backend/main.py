@@ -114,11 +114,13 @@ from routes.steg import router as steg_router
 from routes.attack_extra import router as attack_router
 from routes.ids import router as ids_router
 from routes.otp import router as otp_router
+from routes.secure_meter import router as secure_meter_router
 
 app.include_router(steg_router, prefix="/api/steg", tags=["steganography"])
 app.include_router(attack_router, prefix="/api/attacks", tags=["attacks"])
 app.include_router(otp_router, prefix="/api/otp", tags=["layer2-otp"])
 app.include_router(ids_router, prefix="/api/ids", tags=["layer3-ids", "layer4-honeypot"])
+app.include_router(secure_meter_router, prefix="/api/meter", tags=["layer5-signing", "layer6-physics"])
 
 # Wrap the entire FastAPI app with the transport middleware at the very end
 # This gives us access to the raw ASGI transport object
