@@ -112,9 +112,13 @@ async def get_meter_voltage(
 # Import and register routers
 from routes.steg import router as steg_router
 from routes.attack_extra import router as attack_router
+from routes.ids import router as ids_router
+from routes.otp import router as otp_router
 
 app.include_router(steg_router, prefix="/api/steg", tags=["steganography"])
 app.include_router(attack_router, prefix="/api/attacks", tags=["attacks"])
+app.include_router(otp_router, prefix="/api/otp", tags=["layer2-otp"])
+app.include_router(ids_router, prefix="/api/ids", tags=["layer3-ids", "layer4-honeypot"])
 
 # Wrap the entire FastAPI app with the transport middleware at the very end
 # This gives us access to the raw ASGI transport object
